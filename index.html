@@ -1,0 +1,505 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Student Marks System</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a mark book. Header with array capacity, then a two-column workspace (entry + stats on the left, the ledger table on the right); stacks on phones. */
+:root {
+  --bg: #eef1f5;
+  --surface: #fbfcfd;
+  --surface-2: #e4e9f0;
+  --line: #cdd5e0;
+  --fg: #16202e;
+  --muted: #566376;
+  --accent: #1f4fd8;
+  --accent-fg: #ffffff;
+  --pass: #17794a;
+  --pass-bg: #d9f1e4;
+  --fail: #b3261e;
+  --fail-bg: #f8dedb;
+  --hit: #fff0b8;
+  --font-display: "Familjen Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1621;
+    --surface: #17202e;
+    --surface-2: #1f2a3b;
+    --line: #2f3c52;
+    --fg: #e6ebf3;
+    --muted: #94a2b8;
+    --accent: #6f98ff;
+    --accent-fg: #0b1220;
+    --pass: #5fd49a;
+    --pass-bg: #163a2a;
+    --fail: #ff8d85;
+    --fail-bg: #43201f;
+    --hit: #4a4018;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1621;
+  --surface: #17202e;
+  --surface-2: #1f2a3b;
+  --line: #2f3c52;
+  --fg: #e6ebf3;
+  --muted: #94a2b8;
+  --accent: #6f98ff;
+  --accent-fg: #0b1220;
+  --pass: #5fd49a;
+  --pass-bg: #163a2a;
+  --fail: #ff8d85;
+  --fail-bg: #43201f;
+  --hit: #4a4018;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  padding-block: 28px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+h1, h2 { font-family: var(--font-display); margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(1.7rem, 4vw, 2.4rem); line-height: 1.1; letter-spacing: -0.01em; }
+h2 { font-size: 1.05rem; letter-spacing: 0.01em; }
+.label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); font-weight: 600; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+header { display: flex; flex-wrap: wrap; gap: 16px 32px; align-items: flex-end; justify-content: space-between; }
+header .lede { color: var(--muted); max-width: 52ch; margin: 8px 0 0; }
+.capacity { min-width: min(100%, 260px); display: flex; flex-direction: column; gap: 6px; }
+.capacity .row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.slots { display: grid; grid-template-columns: repeat(25, 1fr); gap: 2px; }
+.slots i { height: 10px; border-radius: 2px; background: var(--surface-2); border: 1px solid var(--line); }
+.slots i.on { background: var(--accent); border-color: var(--accent); }
+
+.grid { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 860px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+
+form { display: flex; flex-direction: column; gap: 12px; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label { font-size: 0.82rem; font-weight: 500; }
+input[type="text"], input[type="number"] {
+  font: inherit; color: var(--fg); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 6px; padding: 9px 11px; width: 100%; min-width: 0;
+}
+input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button {
+  font: inherit; font-weight: 600; cursor: pointer; border-radius: 6px; padding: 9px 14px;
+  border: 1px solid var(--line); background: var(--surface-2); color: var(--fg);
+}
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+button.small { padding: 5px 10px; font-size: 0.82rem; }
+button.danger { color: var(--fail); }
+button.danger.armed { background: var(--fail); color: var(--surface); border-color: var(--fail); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.status { min-height: 1.5em; font-size: 0.88rem; font-family: var(--font-mono); padding: 8px 11px; border-radius: 6px; background: var(--surface-2); color: var(--fg); }
+.status.ok { background: var(--pass-bg); color: var(--pass); }
+.status.err { background: var(--fail-bg); color: var(--fail); }
+
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; margin: 0; }
+.stats div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.stats dt { margin: 0; }
+.stats dd { margin: 0; font-family: var(--font-mono); font-size: 1.15rem; font-weight: 500; overflow-wrap: anywhere; }
+.stats dd small { font-family: var(--font-body); font-size: 0.8rem; color: var(--muted); display: block; }
+.stats .wide { grid-column: 1 / -1; }
+.bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--surface-2); }
+.bar span { display: block; height: 100%; }
+.bar .p { background: var(--pass); }
+.bar .f { background: var(--fail); }
+
+.tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.tools .search { flex: 1 1 200px; display: flex; gap: 8px; min-width: 0; }
+.table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; min-width: 520px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); background: var(--surface-2); font-weight: 600; white-space: nowrap; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr.hit td { background: var(--hit); }
+td.num, th.num { text-align: right; }
+td.idx { color: var(--muted); }
+.pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 600; }
+.pill.pass { background: var(--pass-bg); color: var(--pass); }
+.pill.fail { background: var(--fail-bg); color: var(--fail); }
+.actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+.edit-input { width: 5.5rem; padding: 5px 8px; text-align: right; font-family: var(--font-mono); }
+.empty { padding: 28px 16px; text-align: center; color: var(--muted); }
+.note { font-size: 0.8rem; color: var(--muted); margin: 0; }
+.theme-row { display: flex; justify-content: flex-end; }
+@media (prefers-reduced-motion: no-preference) {
+  tbody tr { transition: background-color 0.25s; }
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="label">Class mark book</div>
+      <h1>Student Marks System</h1>
+      <p class="lede">Records live in two parallel arrays, names and marks, with room for 50 students. Pass mark is 50.</p>
+    </div>
+    <div class="capacity" aria-label="Array capacity">
+      <div class="row"><span class="label">Array slots used</span><span class="mono" id="capText">0 / 50</span></div>
+      <div class="slots" id="slots"></div>
+    </div>
+  </header>
+
+  <div class="grid">
+    <div class="col">
+      <section class="panel" aria-labelledby="addH">
+        <div class="panel-head"><h2 id="addH">Add student</h2><span class="label">Menu 1</span></div>
+        <form id="addForm" novalidate>
+          <div class="field">
+            <label for="nameIn">Student name</label>
+            <input type="text" id="nameIn" autocomplete="off" placeholder="e.g. Ama Mensah">
+          </div>
+          <div class="field">
+            <label for="marksIn">Marks (0 to 100)</label>
+            <input type="number" id="marksIn" step="any" inputmode="decimal" placeholder="e.g. 72.5">
+          </div>
+          <button class="primary" type="submit">Add student</button>
+        </form>
+        <div class="status" id="status" role="status" aria-live="polite">Ready.</div>
+      </section>
+
+      <section class="panel" aria-labelledby="statH">
+        <div class="panel-head"><h2 id="statH">Class statistics</h2><span class="label">Menu 3</span></div>
+        <div id="statsBody"></div>
+      </section>
+    </div>
+
+    <section class="panel" aria-labelledby="tblH">
+      <div class="panel-head"><h2 id="tblH">All students</h2><span class="label">Menus 2, 4, 5, 6, 7</span></div>
+      <div class="tools">
+        <form class="search" id="searchForm" novalidate>
+          <input type="text" id="searchIn" autocomplete="off" placeholder="Search by exact name" aria-label="Search by name">
+          <button type="submit">Search</button>
+        </form>
+        <button type="button" id="sortBtn">Sort by marks, high to low</button>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr><th>No.</th><th>Index</th><th>Name</th><th class="num">Marks</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="tools">
+        <button type="button" class="small" id="exampleBtn">Load example class</button>
+        <button type="button" class="small danger" id="clearBtn">Clear all</button>
+      </div>
+      <p class="note">The starting rows are example data. Replace them with your own class. Records are kept in this browser only.</p>
+    </section>
+  </div>
+
+  <div class="theme-row"><button type="button" class="small" id="themeBtn">Switch theme</button></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var MAX_STUDENTS = 50;
+  var PASS_MARK = 50;
+  var STORE_KEY = "student-marks-v1";
+
+  // Parallel arrays, as in the C++ program: names[i] and marks[i] describe the same student.
+  var names = [];
+  var marks = [];
+  var count = 0;
+  var hitIndex = -1;
+  var editIndex = -1;
+  var armedDelete = -1;
+
+  var EXAMPLE = [
+    ["Ama Mensah", 78], ["Kwame Boateng", 45.5], ["Efua Owusu", 91],
+    ["Yaw Asante", 50], ["Abena Quartey", 63.5], ["Kofi Annan Jr", 38],
+    ["Akosua Darko", 84], ["Nana Adjei", 57]
+  ];
+
+  var $ = function (id) { return document.getElementById(id); };
+  var statusEl = $("status");
+
+  function setStatus(msg, kind) {
+    statusEl.textContent = msg;
+    statusEl.className = "status" + (kind ? " " + kind : "");
+  }
+
+  function fmt1(n) { return n.toFixed(1); }
+
+  function save() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify({ names: names.slice(0, count), marks: marks.slice(0, count) })); } catch (e) {}
+  }
+  function load() {
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return false;
+      var d = JSON.parse(raw);
+      if (!d || !Array.isArray(d.names) || !Array.isArray(d.marks)) return false;
+      names = []; marks = [];
+      for (var i = 0; i < d.names.length && i < MAX_STUDENTS; i++) {
+        var m = Number(d.marks[i]);
+        if (typeof d.names[i] === "string" && isFinite(m) && m >= 0 && m <= 100) { names.push(d.names[i]); marks.push(m); }
+      }
+      count = names.length;
+      return true;
+    } catch (e) { return false; }
+  }
+  function loadExample() {
+    names = EXAMPLE.map(function (r) { return r[0]; });
+    marks = EXAMPLE.map(function (r) { return r[1]; });
+    count = names.length;
+  }
+
+  // ---------- Operations ----------
+
+  function addStudent(name, marksText) {
+    if (count >= MAX_STUDENTS) { setStatus("Array is full. Cannot add more students.", "err"); return false; }
+    name = name.trim();
+    if (!name) { setStatus("Enter a student name.", "err"); return false; }
+    if (marksText.trim() === "" || !isFinite(Number(marksText))) { setStatus("Invalid input type. Student not added.", "err"); return false; }
+    var m = Number(marksText);
+    if (m < 0 || m > 100) { setStatus("Invalid marks range (must be 0-100). Student not added.", "err"); return false; }
+    names[count] = name;
+    marks[count] = m;
+    count++;
+    hitIndex = -1;
+    save();
+    setStatus("Student added.", "ok");
+    return true;
+  }
+
+  function searchStudent(target) {
+    target = target.trim();
+    if (!target) { setStatus("Enter a name to search.", "err"); return; }
+    for (var i = 0; i < count; i++) {           // linear search, O(n)
+      if (names[i] === target) {
+        hitIndex = i;
+        setStatus("Found at position " + (i + 1) + ": " + names[i] + " scored " + fmt1(marks[i]), "ok");
+        render();
+        var row = document.querySelector("tr.hit");
+        if (row && row.scrollIntoView) { try { row.scrollIntoView({ block: "nearest" }); } catch (e) {} }
+        return;
+      }
+    }
+    hitIndex = -1;
+    setStatus("Student not found.", "err");
+    render();
+  }
+
+  function sortByMarksDescending() {
+    // Bubble sort: swap BOTH arrays so names stay matched with marks.
+    for (var i = 0; i < count - 1; i++) {
+      for (var j = 0; j < count - i - 1; j++) {
+        if (marks[j] < marks[j + 1]) {
+          var tm = marks[j]; marks[j] = marks[j + 1]; marks[j + 1] = tm;
+          var tn = names[j]; names[j] = names[j + 1]; names[j + 1] = tn;
+        }
+      }
+    }
+    hitIndex = -1; editIndex = -1; armedDelete = -1;
+    save();
+    setStatus("Sorted by marks (highest first).", "ok");
+  }
+
+  function updateMarks(i, text) {
+    if (text.trim() === "" || !isFinite(Number(text))) { setStatus("Invalid input.", "err"); return false; }
+    var m = Number(text);
+    if (m < 0 || m > 100) { setStatus("Invalid marks.", "err"); return false; }
+    marks[i] = m;
+    save();
+    setStatus("Updated.", "ok");
+    return true;
+  }
+
+  function deleteStudent(i) {
+    // Shift everything after i one place left: O(n)
+    for (var j = i; j < count - 1; j++) { names[j] = names[j + 1]; marks[j] = marks[j + 1]; }
+    names.length = count - 1;
+    marks.length = count - 1;
+    count--;
+    hitIndex = -1; editIndex = -1; armedDelete = -1;
+    save();
+    setStatus("Deleted.", "ok");
+  }
+
+  // ---------- Rendering ----------
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+
+  function renderSlots() {
+    var s = $("slots");
+    s.textContent = "";
+    for (var i = 0; i < MAX_STUDENTS; i++) s.appendChild(el("i", i < count ? "on" : ""));
+    $("capText").textContent = count + " / " + MAX_STUDENTS;
+  }
+
+  function renderStats() {
+    var box = $("statsBody");
+    box.textContent = "";
+    if (count === 0) { box.appendChild(el("div", "empty", "No records yet.")); return; }
+    var sum = 0, highest = marks[0], lowest = marks[0], hiIdx = 0, loIdx = 0, passed = 0;
+    for (var i = 0; i < count; i++) {
+      sum += marks[i];
+      if (marks[i] > highest) { highest = marks[i]; hiIdx = i; }
+      if (marks[i] < lowest) { lowest = marks[i]; loIdx = i; }
+      if (marks[i] >= PASS_MARK) passed++;
+    }
+    var dl = el("dl", "stats");
+    function item(label, value, sub, wide) {
+      var d = el("div", wide ? "wide" : "");
+      d.appendChild(el("dt", "label", label));
+      var dd = el("dd", "", value);
+      if (sub) dd.appendChild(el("small", "", sub));
+      d.appendChild(dd);
+      dl.appendChild(d);
+    }
+    item("Students", String(count));
+    item("Average", (sum / count).toFixed(2));
+    item("Highest", highest.toFixed(2), names[hiIdx]);
+    item("Lowest", lowest.toFixed(2), names[loIdx]);
+    box.appendChild(dl);
+    var split = el("div", "");
+    split.style.cssText = "display:flex;flex-direction:column;gap:6px;margin-top:14px";
+    var line = el("div", "mono", "Passed " + passed + "   Failed " + (count - passed));
+    var bar = el("div", "bar");
+    var p = el("span", "p"); p.style.width = (passed / count * 100) + "%";
+    var f = el("span", "f"); f.style.width = ((count - passed) / count * 100) + "%";
+    bar.appendChild(p); bar.appendChild(f);
+    bar.setAttribute("role", "img");
+    bar.setAttribute("aria-label", passed + " passed, " + (count - passed) + " failed");
+    split.appendChild(line); split.appendChild(bar);
+    box.appendChild(split);
+  }
+
+  function renderRows() {
+    var tb = $("rows");
+    tb.textContent = "";
+    if (count === 0) {
+      var tr0 = el("tr"); var td0 = el("td", "empty", "No records yet. Add a student to begin.");
+      td0.colSpan = 6; tr0.appendChild(td0); tb.appendChild(tr0);
+      return;
+    }
+    for (var i = 0; i < count; i++) {
+      (function (i) {
+        var tr = el("tr", i === hitIndex ? "hit" : "");
+        tr.appendChild(el("td", "mono", String(i + 1)));
+        tr.appendChild(el("td", "mono idx", "[" + i + "]"));
+        tr.appendChild(el("td", "", names[i]));
+
+        var tdM = el("td", "num mono");
+        if (editIndex === i) {
+          var inp = el("input", "edit-input");
+          inp.type = "number"; inp.step = "any"; inp.value = marks[i];
+          inp.id = "editMarks";
+          inp.setAttribute("aria-label", "New marks for " + names[i]);
+          inp.addEventListener("keydown", function (ev) {
+            if (ev.key === "Enter") { if (updateMarks(i, inp.value)) { editIndex = -1; } render(); }
+            if (ev.key === "Escape") { editIndex = -1; render(); }
+          });
+          tdM.appendChild(inp);
+        } else {
+          tdM.textContent = fmt1(marks[i]);
+        }
+        tr.appendChild(tdM);
+
+        var tdS = el("td");
+        var pass = marks[i] >= PASS_MARK;
+        tdS.appendChild(el("span", "pill " + (pass ? "pass" : "fail"), pass ? "Pass" : "Fail"));
+        tr.appendChild(tdS);
+
+        var tdA = el("td"); var act = el("div", "actions");
+        if (editIndex === i) {
+          var save1 = el("button", "small primary", "Save"); save1.type = "button";
+          save1.addEventListener("click", function () {
+            var v = $("editMarks").value;
+            if (updateMarks(i, v)) editIndex = -1;
+            render();
+          });
+          var cancel = el("button", "small", "Cancel"); cancel.type = "button";
+          cancel.addEventListener("click", function () { editIndex = -1; render(); });
+          act.appendChild(save1); act.appendChild(cancel);
+        } else {
+          var ed = el("button", "small", "Update"); ed.type = "button";
+          ed.setAttribute("aria-label", "Update marks for " + names[i]);
+          ed.addEventListener("click", function () { editIndex = i; armedDelete = -1; render(); var x = $("editMarks"); if (x) { x.focus(); x.select(); } });
+          var del = el("button", "small danger" + (armedDelete === i ? " armed" : ""), armedDelete === i ? "Confirm delete" : "Delete");
+          del.type = "button";
+          del.setAttribute("aria-label", "Delete " + names[i]);
+          del.addEventListener("click", function () {
+            if (armedDelete === i) { deleteStudent(i); } else { armedDelete = i; setStatus("Press Confirm delete to remove " + names[i] + ".", ""); }
+            render();
+          });
+          act.appendChild(ed); act.appendChild(del);
+        }
+        tdA.appendChild(act); tr.appendChild(tdA);
+        tb.appendChild(tr);
+      })(i);
+    }
+  }
+
+  function render() {
+    renderSlots();
+    renderStats();
+    renderRows();
+    $("sortBtn").disabled = count < 2;
+    $("addForm").querySelector("button").disabled = false;
+  }
+
+  // ---------- Events ----------
+
+  $("addForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    if (addStudent($("nameIn").value, $("marksIn").value)) {
+      $("nameIn").value = ""; $("marksIn").value = ""; $("nameIn").focus();
+    }
+    render();
+  });
+  $("searchForm").addEventListener("submit", function (e) { e.preventDefault(); searchStudent($("searchIn").value); });
+  $("sortBtn").addEventListener("click", function () { sortByMarksDescending(); render(); });
+
+  var clearArmed = false;
+  $("clearBtn").addEventListener("click", function () {
+    var b = $("clearBtn");
+    if (!clearArmed) { clearArmed = true; b.textContent = "Confirm clear all"; b.classList.add("armed"); setStatus("Press Confirm clear all to remove every record.", ""); return; }
+    names = []; marks = []; count = 0; hitIndex = -1; editIndex = -1; armedDelete = -1;
+    clearArmed = false; b.textContent = "Clear all"; b.classList.remove("armed");
+    save(); setStatus("All records cleared.", "ok"); render();
+  });
+  $("exampleBtn").addEventListener("click", function () {
+    loadExample(); hitIndex = -1; editIndex = -1; armedDelete = -1; save();
+    setStatus("Example class loaded.", "ok"); render();
+  });
+
+  $("themeBtn").addEventListener("click", function () {
+    var root = document.documentElement;
+    var cur = root.getAttribute("data-theme");
+    if (!cur) cur = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    root.setAttribute("data-theme", cur === "dark" ? "light" : "dark");
+  });
+
+  if (!load()) { loadExample(); }
+  render();
+})();
+</script>
+
+</body></html>
